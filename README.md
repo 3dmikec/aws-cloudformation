@@ -1,3 +1,2 @@
-# hello-world
-my first repository
-My name is Michael
+# AWS CloudFormation Templates
+Repository for AWS CloudFormation templates
