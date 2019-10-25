@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation Networking Template. Creates a VPC, Internet Gateway, EIP, NAT Gateway,
+  Two Public Subnets, Two Private Subnets, a Public Route to the Internet Gateway,
+  a Private Route to the NAT Gateway, and a Network ACL. 
+Parameters:
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 172.16.0.0/16
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PublicSubnet01CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 172.16.1.0/24
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PublicSubnet02CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 172.16.2.0/24
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PrivateSubnet01CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 172.16.3.0/24
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PrivateSubnet02CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 172.16.4.0/24
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+
+Resources:
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: 'false'
+      EnableDnsSupport: 'true'
+      InstanceTenancy: default
+  myInternetGateway:
+    Type: AWS::EC2::InternetGateway
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref myVPC
+      InternetGatewayId: !Ref myInternetGateway
+  myEIP:
+    DependsOn: AttachGateway
+    Type: AWS::EC2::EIP
+    Properties: 
+      Domain: vpc
+  myNatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId:
+        Fn::GetAtt:
+          - myEIP
+          - AllocationId
+      SubnetId: !Ref PublicSubnet01
+  PublicSubnet01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: !Ref PublicSubnet01CIDR
+      MapPublicIpOnLaunch: 'true'
+      VpcId: !Ref myVPC
+  PublicSubnet02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "us-east-1b"
+      CidrBlock: !Ref PublicSubnet02CIDR
+      MapPublicIpOnLaunch: 'true'
+      VpcId: !Ref myVPC
+  PrivateSubnet01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "us-east-1a"
+      CidrBlock: !Ref PrivateSubnet01CIDR
+      MapPublicIpOnLaunch: 'false'
+      VpcId: !Ref myVPC
+  PrivateSubnet02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: "us-east-1b"
+      CidrBlock: !Ref PrivateSubnet02CIDR
+      MapPublicIpOnLaunch: 'false'
+      VpcId: !Ref myVPC
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+  myPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+       RouteTableId: !Ref PublicRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref myInternetGateway
+  myPrivateRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+       RouteTableId: !Ref PrivateRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       NatGatewayId: !Ref myNatGateway
+  myPublicSubnetRouteTableAssociation01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet01
+      RouteTableId: !Ref PublicRouteTable
+  myPublicSubnetRouteTableAssociation02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet02
+      RouteTableId: !Ref PublicRouteTable
+  myPrivateSubnetRouteTableAssociation01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet01
+      RouteTableId: !Ref PrivateRouteTable
+  myPrivateSubnetRouteTableAssociation02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet02
+      RouteTableId: !Ref PrivateRouteTable
+  myNetworkAcl:
+      Type: AWS::EC2::NetworkAcl
+      Properties:
+         VpcId: !Ref myVPC
+  myNetworkAclEntryEgress:
+      Type: AWS::EC2::NetworkAclEntry
+      Properties:
+         NetworkAclId: !Ref myNetworkAcl
+         RuleNumber: '100'
+         Protocol: "-1"
+         RuleAction: allow
+         Egress: 'true'
+         CidrBlock: 0.0.0.0/0
+  myNetworkAclEntryIngress:
+      Type: AWS::EC2::NetworkAclEntry
+      Properties:
+         NetworkAclId: !Ref myNetworkAcl
+         RuleNumber: '100'
+         Protocol: "-1"
+         RuleAction: allow
+         Egress: 'false'
+         CidrBlock: 0.0.0.0/0
+  myPublicSubnet01NetworkAclAssociation:
+     Type: AWS::EC2::SubnetNetworkAclAssociation
+     Properties:
+       SubnetId: !Ref PublicSubnet01
+       NetworkAclId: !Ref myNetworkAcl
+  myPublicSubnet02NetworkAclAssociation:
+     Type: AWS::EC2::SubnetNetworkAclAssociation
+     Properties:
+       SubnetId: !Ref PublicSubnet02
+       NetworkAclId: !Ref myNetworkAcl
+  myPrivateSubnet01NetworkAclAssociation:
+     Type: AWS::EC2::SubnetNetworkAclAssociation
+     Properties:
+       SubnetId: !Ref PrivateSubnet01
+       NetworkAclId: !Ref myNetworkAcl
+  myPrivateSubnet02NetworkAclAssociation:
+     Type: AWS::EC2::SubnetNetworkAclAssociation
+     Properties:
+       SubnetId: !Ref PrivateSubnet02
+       NetworkAclId: !Ref myNetworkAcl
+
+Outputs:
+  VPC:
+    Description: The ID of the VPC
+    Value: !Ref myVPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  PublicSubnet01:
+    Description: The name of Public Subnet 01
+    Value: !Ref PublicSubnet01
+    Export:
+      Name: !Sub "${AWS::StackName}-PUBLICSUBNET01"
+  PublicSubnets02:
+    Description: The name of Public Subnet 02
+    Value: !Ref PublicSubnet02
+    Export:
+      Name: !Sub "${AWS::StackName}-PUBLICSUBNET02"
+  PrivateSubnet01:
+    Description: The name of Private Subnets 01
+    Value: !Ref PrivateSubnet01
+    Export:
+      Name: !Sub "${AWS::StackName}-PRIVATESUBNET01"
+  PrivateSubnet02:
+    Description: The name of Private Subnet 02
+    Value: !Ref PrivateSubnet02
+    Export:
+      Name: !Sub "${AWS::StackName}-PRIVATESUBNET02"

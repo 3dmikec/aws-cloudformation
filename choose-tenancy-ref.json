@@ -1,0 +1,23 @@
+{
+ "AWSTemplateFormatVersion" : "2010-09-09",
+ "Parameters" : {
+   "ChooseInstanceTenancy" : {
+     "Type" : "String",
+     "Default" : "default",
+     "AllowedValues" : ["default", "dedicated"],
+     "Description" : "Choose whether the VPC will have default or dedicated tenancy."
+     }
+  },
+ "Resources" : {
+   "myVPC" : {
+     "Type" : "AWS::EC2::VPC",
+     "Properties" : {
+       "CidrBlock" : "10.0.0.0/16",
+       "EnableDnsSupport" : "false",
+       "EnableDnsHostnames" : "false",
+       "InstanceTenancy" : { "Ref" : "ChooseInstanceTenancy" },
+       "Tags" : [ {"Key" : "foo", "Value" : "bar"} ]
+       }
+   }
+ }
+}
